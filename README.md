@@ -6,7 +6,7 @@ Playing around with encoding using gstreamer.
 
 ## gstreamer-tutorials
 
-Using [gstreamermm][gstreamermm] to implement [the tutorials in the GStreamer documentation][gstreamer_tutorails] in
+Using [gstreamermm][gstreamermm] to implement [the tutorials in the GStreamer documentation][gstreamer_tutorials] in
 C++.
 
 Uploaded the [gstreamermm docs][gstreamermm_docs] to my website for easy reference.
