@@ -7,6 +7,8 @@ int main(int argc, char *argv[]) {
   Gst::init(argc, argv);
 
   auto source = Gst::ElementFactory::create_element("videotestsrc", "source");
+  auto filter = Gst::ElementFactory::create_element("vertigotv", "filter");
+  auto convert = Gst::ElementFactory::create_element("videoconvert", "convert");
   auto sink = Gst::ElementFactory::create_element("autovideosink", "sink");
 
   auto pipeline = Gst::Pipeline::create("test-pipeline");
@@ -15,8 +17,8 @@ int main(int argc, char *argv[]) {
   // Elements have to belong to the same bin to link together, and the linking
   // order is source->sink.
   try {
-    pipeline->add(source)->add(sink);
-    source->link(sink);
+    pipeline->add(source)->add(filter)->add(convert)->add(sink);
+    source->link(filter)->link(convert)->link(sink);
   } catch (std::runtime_error &e) {
     std::cerr << e.what() << std::endl;
     return 1;
