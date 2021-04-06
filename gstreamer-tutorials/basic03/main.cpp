@@ -6,9 +6,11 @@
 
 struct PipelineElements {
   Glib::RefPtr<Gst::Element> source;
-  Glib::RefPtr<Gst::Element> convert;
-  Glib::RefPtr<Gst::Element> resample;
-  Glib::RefPtr<Gst::Element> sink;
+  Glib::RefPtr<Gst::Element> audio_convert;
+  Glib::RefPtr<Gst::Element> audio_resample;
+  Glib::RefPtr<Gst::Element> audio_sink;
+  Glib::RefPtr<Gst::Element> video_convert;
+  Glib::RefPtr<Gst::Element> video_sink;
 
   void register_pad_added_handler() {
     // I think we have to use a wrapper function in order to take the address of
@@ -23,27 +25,41 @@ private:
     // it's `source`.
     // If we wanted to reuse the same handler for signals from multiple sources,
     // we could just bind another argument I suppose.
-    auto sink_pad = convert->get_static_pad("sink");
+    auto audio_sink_pad = audio_convert->get_static_pad("sink");
+    auto video_sink_pad = video_convert->get_static_pad("sink");
 
-    std::cout << "Received new pad " << new_pad->get_name() << " from "
-              << source->get_name() << std::endl;
+    auto new_pad_caps = new_pad->get_current_caps();
+    auto new_pad_struct = new_pad_caps->get_structure(0);
+    auto new_pad_type = new_pad_struct.get_name();
 
-    // Nothing to do if it's already linked
-    if (!sink_pad->is_linked()) {
-      auto new_pad_caps = new_pad->get_current_caps();
-      auto new_pad_struct = new_pad_caps->get_structure(0);
-      auto new_pad_type = new_pad_struct.get_name();
-      std::string desired_type{"audio/x-raw"};
+    std::cout << "Received new pad " << new_pad->get_name() << " with type "
+              << new_pad_type << " from " << source->get_name() << std::endl;
+
+    if (!audio_sink_pad->is_linked()) {
+      const std::string desired_type{"audio/x-raw"};
       if (new_pad_type.compare(0, desired_type.size(), desired_type) != 0) {
         std::cerr << "Pad has type " << new_pad_type << " but " << desired_type
                   << " is required" << std::endl;
-        return;
-      }
-
-      if (new_pad->link(sink_pad) != Gst::PadLinkReturn::PAD_LINK_OK) {
-        std::cerr << "Pad link failed" << std::endl;
       } else {
-        std::cout << "Pad link succeess!" << std::endl;
+        if (new_pad->link(audio_sink_pad) != Gst::PadLinkReturn::PAD_LINK_OK) {
+          std::cerr << "Audio sink pad link failed" << std::endl;
+        } else {
+          std::cout << "Audio sink pad link succeess!" << std::endl;
+        }
+      }
+    }
+
+    if (!video_sink_pad->is_linked()) {
+      const std::string desired_type{"video/x-raw"};
+      if (new_pad_type.compare(0, desired_type.size(), desired_type) != 0) {
+        std::cerr << "Pad has type " << new_pad_type << " but " << desired_type
+                  << " is required" << std::endl;
+      } else {
+        if (new_pad->link(video_sink_pad) != Gst::PadLinkReturn::PAD_LINK_OK) {
+          std::cerr << "Video sink pad link failed" << std::endl;
+        } else {
+          std::cout << "Video sink pad link succeess!" << std::endl;
+        }
       }
     }
   }
@@ -54,10 +70,16 @@ int main(int argc, char *argv[]) {
 
   PipelineElements elements{
       .source = Gst::ElementFactory::create_element("uridecodebin", "source"),
-      .convert = Gst::ElementFactory::create_element("audioconvert", "convert"),
-      .resample =
-          Gst::ElementFactory::create_element("audioresample", "resample"),
-      .sink = Gst::ElementFactory::create_element("autoaudiosink", "sink"),
+      .audio_convert =
+          Gst::ElementFactory::create_element("audioconvert", "audio-convert"),
+      .audio_resample = Gst::ElementFactory::create_element("audioresample",
+                                                            "audio-resample"),
+      .audio_sink =
+          Gst::ElementFactory::create_element("autoaudiosink", "audio-sink"),
+      .video_convert =
+          Gst::ElementFactory::create_element("videoconvert", "video-convert"),
+      .video_sink =
+          Gst::ElementFactory::create_element("autovideosink", "video-sink"),
   };
 
   auto pipeline = Gst::Pipeline::create("test-pipeline");
@@ -65,10 +87,14 @@ int main(int argc, char *argv[]) {
   // This logic could be moved to PipelineElements constructor
   try {
     pipeline->add(elements.source)
-        ->add(elements.convert)
-        ->add(elements.resample)
-        ->add(elements.sink);
-    elements.convert->link(elements.resample)->link(elements.sink);
+        ->add(elements.audio_convert)
+        ->add(elements.audio_resample)
+        ->add(elements.audio_sink)
+        ->add(elements.video_convert)
+        ->add(elements.video_sink);
+    elements.audio_convert->link(elements.audio_resample)
+        ->link(elements.audio_sink);
+    elements.video_convert->link(elements.video_sink);
   } catch (std::runtime_error &e) {
     std::cerr << e.what() << std::endl;
     return 1;
