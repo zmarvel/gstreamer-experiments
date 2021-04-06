@@ -7,3 +7,5 @@ RUN apt update && \
         libgtkmm-3.0-dev libgtkmm-3.0-1v5
 
 RUN apt install -y git clang-format
+
+RUN useradd -U -m user
