@@ -1,66 +1,139 @@
 
 #include <iostream>
+#include <chrono>
 
 #include <gstreamermm.h>
 #include <glibmm/main.h>
 
-struct PipelineElements {
-  Glib::RefPtr<Gst::Element> source;
-  Glib::RefPtr<Gst::Element> audio_convert;
-  Glib::RefPtr<Gst::Element> audio_resample;
-  Glib::RefPtr<Gst::Element> audio_sink;
-  Glib::RefPtr<Gst::Element> video_convert;
-  Glib::RefPtr<Gst::Element> video_sink;
+struct Pipeline {
+  bool playing;   /// Are we playing?
+  bool terminate; /// Are we ready to exit?
+  bool seek_enabled;
+  bool seek_done;
+  std::chrono::nanoseconds duration;
 
-  void register_pad_added_handler() {
-    // I think we have to use a wrapper function in order to take the address of
-    // the member function.
-    source->signal_pad_added().connect(
-        sigc::mem_fun(*this, &PipelineElements::pad_added_handler));
+  Glib::RefPtr<Gst::Element> playbin;
+
+  Pipeline()
+      : playing{false}, terminate{false},
+        seek_enabled{false}, seek_done{false}, duration{GST_CLOCK_TIME_NONE},
+        playbin{Gst::ElementFactory::create_element("playbin", "playbin")} {
+    playbin->set_property(
+        "uri", std::string{"https://www.freedesktop.org/software/gstreamer-sdk/"
+                           "data/media/sintel_trailer-480p.webm"});
   }
 
-private:
-  void pad_added_handler(Glib::RefPtr<Gst::Pad> new_pad) {
-    // Why is the first argument (source element) omitted? I guess we can assume
-    // it's `source`.
-    // If we wanted to reuse the same handler for signals from multiple sources,
-    // we could just bind another argument I suppose.
-    auto audio_sink_pad = audio_convert->get_static_pad("sink");
-    auto video_sink_pad = video_convert->get_static_pad("sink");
+  void run() {
+    if (playbin->set_state(Gst::State::STATE_PLAYING) ==
+        Gst::StateChangeReturn::STATE_CHANGE_FAILURE) {
+      throw std::runtime_error{"Failed to change to playing state"};
+    }
 
-    auto new_pad_caps = new_pad->get_current_caps();
-    auto new_pad_struct = new_pad_caps->get_structure(0);
-    auto new_pad_type = new_pad_struct.get_name();
+    auto bus = playbin->get_bus();
+    while (!terminate) {
+      auto msg = bus->pop(100 * Gst::MILLI_SECOND,
+                          Gst::MessageType::MESSAGE_STATE_CHANGED |
+                              Gst::MessageType::MESSAGE_ERROR |
+                              Gst::MessageType::MESSAGE_EOS |
+                              Gst::MessageType::MESSAGE_DURATION_CHANGED);
 
-    std::cout << "Received new pad " << new_pad->get_name() << " with type "
-              << new_pad_type << " from " << source->get_name() << std::endl;
-
-    if (!audio_sink_pad->is_linked()) {
-      const std::string desired_type{"audio/x-raw"};
-      if (new_pad_type.compare(0, desired_type.size(), desired_type) != 0) {
-        std::cerr << "Pad has type " << new_pad_type << " but " << desired_type
-                  << " is required" << std::endl;
+      if (msg) {
+        handle_message(msg);
       } else {
-        if (new_pad->link(audio_sink_pad) != Gst::PadLinkReturn::PAD_LINK_OK) {
-          std::cerr << "Audio sink pad link failed" << std::endl;
-        } else {
-          std::cout << "Audio sink pad link succeess!" << std::endl;
+        // The timeout expired
+        if (playing) {
+          gint64 current = -1;
+          if (!playbin->query_position(Gst::Format::FORMAT_TIME, current)) {
+            std::cerr << "Failed to query current position" << std::endl;
+          }
+
+          if (GST_CLOCK_TIME_IS_VALID(duration.count())) {
+            gint64 duration_ns = GST_CLOCK_TIME_NONE;
+            if (!playbin->query_duration(Gst::Format::FORMAT_TIME,
+                                         duration_ns)) {
+              std::cerr << "Failed to query duration" << std::endl;
+            } else {
+              duration = decltype(duration){duration_ns};
+            }
+          }
+
+          std::cout << "Position " << current << " / " << duration.count()
+                    << std::endl;
+          if (seek_enabled && !seek_done && current > 10 * GST_SECOND) {
+            std::cout << "Reached 10 s, performing seek" << std::endl;
+            playbin->seek(Gst::Format::FORMAT_TIME,
+                          Gst::SeekFlags::SEEK_FLAG_FLUSH |
+                              Gst::SeekFlags::SEEK_FLAG_KEY_UNIT,
+                          30 * GST_SECOND);
+            seek_done = true;
+          }
         }
       }
     }
 
-    if (!video_sink_pad->is_linked()) {
-      const std::string desired_type{"video/x-raw"};
-      if (new_pad_type.compare(0, desired_type.size(), desired_type) != 0) {
-        std::cerr << "Pad has type " << new_pad_type << " but " << desired_type
-                  << " is required" << std::endl;
-      } else {
-        if (new_pad->link(video_sink_pad) != Gst::PadLinkReturn::PAD_LINK_OK) {
-          std::cerr << "Video sink pad link failed" << std::endl;
+    playbin->set_state(Gst::State::STATE_NULL);
+  }
+
+private:
+  void handle_message(Glib::RefPtr<Gst::Message> msg) {
+    switch (msg->get_message_type()) {
+    case Gst::MessageType::MESSAGE_ERROR: {
+      auto err = Glib::RefPtr<Gst::MessageError>::cast_static(msg);
+      std::cerr << "Error from " << msg->get_source()->get_name() << ": "
+                << err->parse_error().what() << std::endl
+                << "Debug information: " << err->parse_debug() << std::endl;
+      terminate = true;
+    } break;
+    case Gst::MessageType::MESSAGE_EOS: {
+      // auto err = Glib::RefPtr<Gst::MessageEos>::cast_static(msg);
+      std::cout << "Reached end of stream" << std::endl;
+      terminate = true;
+    } break;
+    case Gst::MessageType::MESSAGE_STATE_CHANGED: {
+      if (msg->get_source() == playbin) {
+        auto err = Glib::RefPtr<Gst::MessageStateChanged>::cast_static(msg);
+        auto old_state = err->parse_old_state();
+        auto new_state = err->parse_new_state();
+        // auto pending_state = err->parse_pending_state();
+        std::cout << "Pipeline state changed from " << old_state << " to "
+                  << new_state << std::endl;
+        if (new_state == Gst::State::STATE_PLAYING) {
+          playing = true;
+          // Query the element to determine if we can seek
+          gint64 seek_start = -1;
+          gint64 seek_end = -1;
+#if 0
+          // I think this should work, but it doesn't. See
+          // gstreamermm/examples/ogg_player/main.cc and the comment in
+          // gstreamermm/query.hg.
+          Glib::RefPtr<Gst::QuerySeeking> query =
+              Gst::QuerySeeking::create(Gst::Format::FORMAT_TIME);
+          query->parse(format, seek_enabled, seek_start, seek_end);
+#endif
+          Glib::RefPtr<Gst::Query> query =
+              Gst::QuerySeeking::create(Gst::Format::FORMAT_TIME);
+
+          if (playbin->query(query)) {
+            auto format = Gst::Format::FORMAT_TIME;
+            Glib::RefPtr<Gst::QuerySeeking>::cast_static(query)->parse(
+                format, seek_enabled, seek_start, seek_end);
+            if (seek_enabled) {
+              std::cout << "Seeking is enabled from " << seek_start << " to "
+                        << seek_end << std::endl;
+            } else {
+              std::cout << "Seeking is disabled for playbin" << std::endl;
+            }
+          } else {
+            std::cerr << "Failed to perform seeking query on playbin"
+                      << std::endl;
+          }
         } else {
-          std::cout << "Video sink pad link succeess!" << std::endl;
+          playing = false;
         }
       }
+    } break;
+    default:
+      break;
     }
   }
 };
@@ -68,86 +141,8 @@ private:
 int main(int argc, char *argv[]) {
   Gst::init(argc, argv);
 
-  PipelineElements elements{
-      .source = Gst::ElementFactory::create_element("uridecodebin", "source"),
-      .audio_convert =
-          Gst::ElementFactory::create_element("audioconvert", "audio-convert"),
-      .audio_resample = Gst::ElementFactory::create_element("audioresample",
-                                                            "audio-resample"),
-      .audio_sink =
-          Gst::ElementFactory::create_element("autoaudiosink", "audio-sink"),
-      .video_convert =
-          Gst::ElementFactory::create_element("videoconvert", "video-convert"),
-      .video_sink =
-          Gst::ElementFactory::create_element("autovideosink", "video-sink"),
-  };
+  Pipeline pipeline{};
+  pipeline.run();
 
-  auto pipeline = Gst::Pipeline::create("test-pipeline");
-
-  // This logic could be moved to PipelineElements constructor
-  try {
-    pipeline->add(elements.source)
-        ->add(elements.audio_convert)
-        ->add(elements.audio_resample)
-        ->add(elements.audio_sink)
-        ->add(elements.video_convert)
-        ->add(elements.video_sink);
-    elements.audio_convert->link(elements.audio_resample)
-        ->link(elements.audio_sink);
-    elements.video_convert->link(elements.video_sink);
-  } catch (std::runtime_error &e) {
-    std::cerr << e.what() << std::endl;
-    return 1;
-  }
-
-  elements.source->set_property(
-      "uri", std::string{"https://www.freedesktop.org/software/gstreamer-sdk/"
-                         "data/media/sintel_trailer-480p.webm"});
-
-  elements.register_pad_added_handler();
-
-  if (pipeline->set_state(Gst::State::STATE_PLAYING) ==
-      Gst::StateChangeReturn::STATE_CHANGE_FAILURE) {
-    std::cerr << "Unable to set pipeline state to PLAYING" << std::endl;
-    return 1;
-  }
-
-  auto bus = pipeline->get_bus();
-  auto msg =
-      bus->pop(Gst::CLOCK_TIME_NONE, Gst::MessageType::MESSAGE_STATE_CHANGED |
-                                         Gst::MessageType::MESSAGE_ERROR |
-                                         Gst::MessageType::MESSAGE_EOS);
-  bool done = false;
-
-  while (!done) {
-    if (msg) {
-      switch (msg->get_message_type()) {
-      case Gst::MessageType::MESSAGE_STATE_CHANGED: {
-        if (msg->get_source() == pipeline) {
-          auto err = Glib::RefPtr<Gst::MessageStateChanged>::cast_static(msg);
-          auto old_state = err->parse_old_state();
-          auto new_state = err->parse_new_state();
-          // auto pending_state = err->parse_pending_state();
-          std::cout << "Pipeline state changed from " << old_state << " to "
-                    << new_state << std::endl;
-        }
-      } break;
-      case Gst::MessageType::MESSAGE_ERROR: {
-        auto err = Glib::RefPtr<Gst::MessageError>::cast_static(msg);
-        std::cerr << "Error from " << msg->get_source()->get_name() << ": "
-                  << err->parse_error().what() << std::endl
-                  << "Debug information: " << err->parse_debug() << std::endl;
-      } break;
-      case Gst::MessageType::MESSAGE_EOS: {
-        // auto err = Glib::RefPtr<Gst::MessageEos>::cast_static(msg);
-        std::cout << "Reached end of stream" << std::endl;
-        done = true;
-      } break;
-      default:
-        break;
-      }
-    }
-  }
-
-  pipeline->set_state(Gst::State::STATE_NULL);
+  pipeline.run();
 }
