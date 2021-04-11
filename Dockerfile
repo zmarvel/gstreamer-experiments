@@ -8,4 +8,4 @@ RUN apt update && \
 
 RUN apt install -y git clang-format
 
-RUN useradd -U -m user
+RUN useradd -U -m -s /bin/bash user
