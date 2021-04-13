@@ -11,4 +11,6 @@ if (BUILD_TUTORIALS)
   add_subdirectory(gstreamer-tutorials)
 endif (BUILD_TUTORIALS)
 
+add_subdirectory(lib/sockpp)
+
 add_subdirectory(src)
