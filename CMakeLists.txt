@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(video_encoding CXX)
+project(camcoder CXX)
 
 option(BUILD_TUTORIALS "Build programs in gstreamer-tutorials/" ON)
 
@@ -11,3 +11,4 @@ if (BUILD_TUTORIALS)
   add_subdirectory(gstreamer-tutorials)
 endif (BUILD_TUTORIALS)
 
+add_subdirectory(src)
