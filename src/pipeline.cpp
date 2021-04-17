@@ -5,23 +5,29 @@
 
 using namespace camcoder;
 
-Pipeline::Pipeline()
+Pipeline::Pipeline(size_t width, size_t height, const std::string &format)
     : pipeline_{Gst::Pipeline::create()},
-      appsrc_{Gst::ElementFactory::create_element("videotestsrc")},
+      appsrc_{Gst::ElementFactory::create_element("appsrc")},
       convert_{Gst::ElementFactory::create_element("videoconvert")},
       encoder_{Gst::ElementFactory::create_element("vaapih264enc")},
       // encoder_{Gst::ElementFactory::create_element("nvh264enc")},
       tsmux_{Gst::ElementFactory::create_element("mpegtsmux")},
       hls_sink_{Gst::ElementFactory::create_element("hlssink")},
       terminate_{false}, playing_{false} {
-  // TODO for a true appsrc bin, we'll have to specify the format properties
+  auto video_caps = Gst::Caps::create_simple(
+      "video/x-raw", "format", format, "framerate", Gst::Fraction{30, 1},
+      "pixel-aspect-ratio", Gst::Fraction{1, 1}, "width", width, "height",
+      height);
+  appsrc_->set_property("caps", video_caps);
+  // TODO connect signals
+
   pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
       hls_sink_);
   appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
 
-  auto test_src_pad = appsrc_->get_static_pad("src");
-  test_src_pad->set_property("width", 640);
-  test_src_pad->set_property("height", 480);
+  // auto test_src_pad = appsrc_->get_static_pad("src");
+  // test_src_pad->set_property("width", 640);
+  // test_src_pad->set_property("height", 480);
 }
 
 void Pipeline::operator()() {

@@ -1,6 +1,4 @@
-#ifndef CAMCODER
-#define CAMCODER
-
+#pragma once
 #include <gstreamermm.h>
 
 namespace camcoder {
@@ -9,7 +7,7 @@ public:
   /**
    * Construct and set up the pipeline.
    */
-  Pipeline();
+  Pipeline(size_t width, size_t height, const std::string &format);
 
   /**
    * Run the pipeline.
@@ -35,5 +33,3 @@ private:
   bool playing_;   /// True if the pipeline is in the playing state
 };
 } // namespace camcoder
-
-#endif // CAMCODER
