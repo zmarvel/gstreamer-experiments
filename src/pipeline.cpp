@@ -5,38 +5,59 @@
 
 using namespace camcoder;
 
-Pipeline::Pipeline(size_t width, size_t height, const std::string &format)
-    : pipeline_{Gst::Pipeline::create()},
-      appsrc_{Gst::ElementFactory::create_element("appsrc")},
+Pipeline::Pipeline(const FrameParameters &frame_params)
+    : // appsrc_{Gst::ElementFactory::create_element("appsrc")},
+      appsrc_{Gst::ElementFactory::create_element("videotestsrc")},
       convert_{Gst::ElementFactory::create_element("videoconvert")},
-      encoder_{Gst::ElementFactory::create_element("vaapih264enc")},
+      // encoder_{Gst::ElementFactory::create_element("vaapih264enc")},
       // encoder_{Gst::ElementFactory::create_element("nvh264enc")},
-      tsmux_{Gst::ElementFactory::create_element("mpegtsmux")},
-      hls_sink_{Gst::ElementFactory::create_element("hlssink")},
-      terminate_{false}, playing_{false} {
-  auto video_caps = Gst::Caps::create_simple(
-      "video/x-raw", "format", format, "framerate", Gst::Fraction{30, 1},
-      "pixel-aspect-ratio", Gst::Fraction{1, 1}, "width", width, "height",
-      height);
-  appsrc_->set_property("caps", video_caps);
-  // TODO connect signals
+      // tsmux_{Gst::ElementFactory::create_element("mpegtsmux")},
+      // hls_sink_{Gst::ElementFactory::create_element("hlssink")},
+      hls_sink_{Gst::ElementFactory::create_element("autovideosink")},
+      pipeline_{Gst::Pipeline::create()},
+      terminate_{false}, playing_{false}, ready_{false} {
 
-  pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
-      hls_sink_);
-  appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
+  // Gst::VideoInfo video_info;
+  // video_info.init();
+  // video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB,
+  // frame_params.width,
+  //                       frame_params.height);
+  // video_info.set_fps_n(30);
+  // video_info.set_fps_d(1);
+  // auto video_caps = video_info.to_caps();
 
-  // auto test_src_pad = appsrc_->get_static_pad("src");
-  // test_src_pad->set_property("width", 640);
-  // test_src_pad->set_property("height", 480);
+  // appsrc_->set_property("caps", video_caps);
+  // // appsrc_->set_property("format", GST_FORMAT_TIME);
+  // appsrc_->set_property("block", true);
+
+  // TODO: use signals?
+  // TODO: max-bytes defaults to 200000. 640x480 RGB image is 921600.
+  //
+
+  // pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
+  // hls_sink_);
+  // appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
+
+  // pipeline_->add(appsrc_)->add(convert_)->add(video_sink);
+  // appsrc_->link(convert_)->link(video_sink);
+
+  appsrc_->set_property("pattern", 0);
+  pipeline_->add(appsrc_)->add(convert_)->add(hls_sink_);
+  appsrc_->link(convert_)->link(hls_sink_);
 }
 
 void Pipeline::operator()() {
-
   if (pipeline_->set_state(Gst::State::STATE_PLAYING) ==
       Gst::StateChangeReturn::STATE_CHANGE_FAILURE) {
     throw std::runtime_error{"Failed to change to playing state"};
   }
+  std::cout << "Pipeline start" << std::endl;
 
+  // Gst::Task
+  // Gst::Buffer;
+  // Glib::SignalProxy;
+
+  // TODO: we can do this with a signal handler, I think--is that better?
   auto bus = pipeline_->get_bus();
   while (!terminate_) {
     auto msg = bus->pop(100 * Gst::MILLI_SECOND,
@@ -49,10 +70,10 @@ void Pipeline::operator()() {
       handle_message(msg);
     } else {
       // The timeout expired
-      if (playing_) {
-      }
     }
   }
+  pipeline_->set_state(Gst::State::STATE_NULL);
+  std::cout << "Pipeline done" << std::endl;
 }
 
 void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
@@ -75,14 +96,15 @@ void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
       auto new_state = err->parse_new_state();
       std::cout << "Pipeline state changed from " << old_state << " to "
                 << new_state << std::endl;
-      if (new_state == Gst::State::STATE_PLAYING) {
-        playing_ = true;
-      } else {
-        playing_ = false;
-      }
+      ready_ = new_state == Gst::State::STATE_READY;
+      playing_ = new_state == Gst::State::STATE_PLAYING;
     }
   } break;
   default:
+    std::cerr << "Unrecognized message type "
+              << gst_message_type_get_name(
+                     static_cast<GstMessageType>(msg->get_message_type()))
+              << std::endl;
     break;
   }
 }

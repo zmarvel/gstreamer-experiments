@@ -13,4 +13,9 @@ endif (BUILD_TUTORIALS)
 
 add_subdirectory(lib/sockpp)
 
+add_library(BlockingCollection INTERFACE)
+target_include_directories(BlockingCollection INTERFACE lib/BlockingCollection)
+
+add_compile_options(-Wall -Wextra)
+
 add_subdirectory(src)

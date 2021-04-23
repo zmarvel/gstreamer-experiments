@@ -1,3 +1,6 @@
 [submodule "lib/sockpp"]
 	path = lib/sockpp
 	url = https://github.com/fpagliughi/sockpp.git
+[submodule "lib/BlockingCollection"]
+	path = lib/BlockingCollection
+	url = https://github.com/CodeExMachina/BlockingCollection.git
