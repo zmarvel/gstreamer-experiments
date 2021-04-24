@@ -6,7 +6,7 @@
 #include "BlockingCollection.h"
 
 #include "pipeline.hpp"
-#include "tcp_client_frame_source.hpp"
+#include "tcp_server_frame_source.hpp"
 
 using namespace camcoder;
 
@@ -29,7 +29,7 @@ RGBFrame generate_frame(int i) {
 }
 #endif
 
-std::ostream &operator<<(std::ostream &os, const RGBPixel &pix) {
+static std::ostream &operator<<(std::ostream &os, const RGBPixel &pix) {
   os << static_cast<uint32_t>(pix.r) << " " << static_cast<uint32_t>(pix.g)
      << " " << static_cast<uint32_t>(pix.b);
   return os;
@@ -37,11 +37,11 @@ std::ostream &operator<<(std::ostream &os, const RGBPixel &pix) {
 
 static void frame_producer_thread() {
   using namespace std::chrono_literals;
-  TCPClientFrameSource frame_source{"127.0.0.1", 9000, frame_params};
+  TCPServerFrameSource frame_source{"127.0.0.1", 9000, frame_params};
   int i = 0;
   while (true) {
     if (!frame_source.connected()) {
-      frame_source.connect();
+      frame_source.accept();
     }
     i++;
     auto frame = frame_source.get_frame<RGBFrame>();
