@@ -17,7 +17,7 @@ public:
   template <typename TFrame> TFrame get_frame();
   explicit operator bool() const { return good() && !eof(); }
 
-  bool end() const { return eof(); }
+  bool finished() const { return eof(); }
 
 protected:
   virtual size_t read(char *buf, size_t n) = 0;
@@ -33,13 +33,5 @@ protected:
 private:
   FrameParameters frame_params_;
 };
-
-// TODO
-#if 0
-class TcpClientFrameSource : public FrameSource {
-private:
-  std::unique_ptr<char[]> read(size_t n) override {}
-};
-#endif
 
 } // namespace camcoder

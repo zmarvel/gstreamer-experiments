@@ -19,3 +19,5 @@ target_include_directories(BlockingCollection INTERFACE lib/BlockingCollection)
 add_compile_options(-Wall -Wextra)
 
 add_subdirectory(src)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE sockpp)

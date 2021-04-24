@@ -2,10 +2,11 @@
 #include <thread>
 #include <assert.h>
 
+#include <sockpp/socket.h>
 #include "BlockingCollection.h"
 
 #include "pipeline.hpp"
-#include "file_frame_source.hpp"
+#include "tcp_client_frame_source.hpp"
 
 using namespace camcoder;
 
@@ -36,21 +37,15 @@ std::ostream &operator<<(std::ostream &os, const RGBPixel &pix) {
 
 static void frame_producer_thread() {
   using namespace std::chrono_literals;
-  FileFrameSource f{"out.bin", frame_params};
+  TCPClientFrameSource frame_source{"127.0.0.1", 9000, frame_params};
   int i = 0;
   while (true) {
-    i++;
-    try {
-      auto frame = f.get_frame<RGBFrame>();
-      frame_q.add(std::move(frame));
-    } catch (std::runtime_error &e) {
-      if (f.end()) {
-        f.clear();
-        f.seek(0);
-      } else {
-        throw e;
-      }
+    if (!frame_source.connected()) {
+      frame_source.connect();
     }
+    i++;
+    auto frame = frame_source.get_frame<RGBFrame>();
+    frame_q.add(std::move(frame));
   }
   frame_q.complete_adding();
   std::cout << "Producer done" << std::endl;
@@ -74,6 +69,10 @@ static void frame_consumer_thread(Pipeline &p) {
 }
 
 int main() {
+  // Only needed if we're writing socket code, but for now we'll assume it
+  // doesn't hurt to initialize it.
+  sockpp::socket_initializer{};
+
   Gst::init();
   Pipeline p{frame_params};
   std::thread pipeline_thread{std::ref(p)};
