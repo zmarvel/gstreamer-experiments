@@ -5,7 +5,7 @@
 #include "BlockingCollection.h"
 
 #include "pipeline.hpp"
-#include "frame_source.hpp"
+#include "file_frame_source.hpp"
 
 using namespace camcoder;
 
