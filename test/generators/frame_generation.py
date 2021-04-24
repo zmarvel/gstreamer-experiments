@@ -5,18 +5,20 @@ def rgb_gradient(width, height, step=0):
     # We want to go from all red to all blue
     period = 90  # cycle in number of frames/steps
     step %= period
-    r_ratio = ((period - step) / period / 3)
-    b_ratio = (step / period / 3)
+    r_ratio = ((period - step) / period)
+    b_ratio = (step / period)
     r = int(255.999 * r_ratio)
     b = int(255.999 * b_ratio)
-    for col in range(width):
-        for row in range(height):
+    for row in range(height):
+        for col in range(width):
             g_ratio = (col + row * 2) / (width + height * 2)
             g = int(255.999 * g_ratio)
             i = row * width + col
-            frame[i] = r
-            frame[i+1] = g
-            frame[i+2] = b
+            frame[3*i] = r
+            frame[3*i+1] = g
+            frame[3*i+2] = b
+    print(int(frame[0]), int(frame[1]), int(frame[2]))
+    print(int(frame[7680]), int(frame[7680+1]), int(frame[7680+2]))
     return frame
 
 
@@ -44,6 +46,7 @@ if __name__ == '__main__':
 
         with open(args.out_path, 'w+b') as f:
             for i in range(args.num_frames):
-                f.write(rgb_gradient(args.width, args.height, args.num_frames))
+                print(i)
+                f.write(rgb_gradient(args.width, args.height, i))
 
     main()

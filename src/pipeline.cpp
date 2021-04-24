@@ -6,44 +6,38 @@
 using namespace camcoder;
 
 Pipeline::Pipeline(const FrameParameters &frame_params)
-    : // appsrc_{Gst::ElementFactory::create_element("appsrc")},
-      appsrc_{Gst::ElementFactory::create_element("videotestsrc")},
+    : appsrc_{Gst::ElementFactory::create_element("appsrc")},
       convert_{Gst::ElementFactory::create_element("videoconvert")},
+      encoder_{Gst::ElementFactory::create_element("x264enc")},
       // encoder_{Gst::ElementFactory::create_element("vaapih264enc")},
       // encoder_{Gst::ElementFactory::create_element("nvh264enc")},
-      // tsmux_{Gst::ElementFactory::create_element("mpegtsmux")},
-      // hls_sink_{Gst::ElementFactory::create_element("hlssink")},
-      hls_sink_{Gst::ElementFactory::create_element("autovideosink")},
+      tsmux_{Gst::ElementFactory::create_element("mpegtsmux")},
+      hls_sink_{Gst::ElementFactory::create_element("hlssink")},
       pipeline_{Gst::Pipeline::create()},
       terminate_{false}, playing_{false}, ready_{false} {
 
-  // Gst::VideoInfo video_info;
-  // video_info.init();
-  // video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB,
-  // frame_params.width,
-  //                       frame_params.height);
-  // video_info.set_fps_n(30);
-  // video_info.set_fps_d(1);
-  // auto video_caps = video_info.to_caps();
+  // TODO check for null elements
 
-  // appsrc_->set_property("caps", video_caps);
-  // // appsrc_->set_property("format", GST_FORMAT_TIME);
-  // appsrc_->set_property("block", true);
+  Gst::VideoInfo video_info;
+  video_info.init();
+  video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB, frame_params.width,
+                        frame_params.height);
+  video_info.set_fps_n(30);
+  video_info.set_fps_d(1);
+  auto video_caps = video_info.to_caps();
+
+  appsrc_->set_property("caps", video_caps);
+  // appsrc_->set_property("format", GST_FORMAT_TIME);
+  appsrc_->set_property("block", true);
 
   // TODO: use signals?
-  // TODO: max-bytes defaults to 200000. 640x480 RGB image is 921600.
-  //
 
-  // pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
-  // hls_sink_);
-  // appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
+  pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
+      hls_sink_);
+  appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
 
-  // pipeline_->add(appsrc_)->add(convert_)->add(video_sink);
-  // appsrc_->link(convert_)->link(video_sink);
-
-  appsrc_->set_property("pattern", 0);
-  pipeline_->add(appsrc_)->add(convert_)->add(hls_sink_);
-  appsrc_->link(convert_)->link(hls_sink_);
+  // pipeline_->add(appsrc_)->add(convert_)->add(hls_sink_);
+  // appsrc_->link(convert_)->link(hls_sink_);
 }
 
 void Pipeline::operator()() {

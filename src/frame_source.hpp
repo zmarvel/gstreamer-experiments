@@ -14,23 +14,10 @@ public:
   FrameSource(const FrameParameters &frame_params)
       : frame_params_{frame_params} {}
 
-  std::unique_ptr<Frame> get_frame() {
-    // std::unique_ptr<Frame> frame;
-    switch (frame_params_.pixel_format) {
-    case PixelFormat::INVALID:
-      return nullptr;
-    case PixelFormat::RGB: {
-      auto frame =
-          std::make_unique<RGBFrame>(frame_params_.width, frame_params_.height);
-      read(reinterpret_cast<char *>(frame->data()), frame_size_bytes());
-      return frame;
-    }
-    default:
-      return nullptr;
-    }
-  }
-
+  template <typename TFrame> TFrame get_frame();
   explicit operator bool() const { return good() && !eof(); }
+
+  bool end() const { return eof(); }
 
 protected:
   virtual size_t read(char *buf, size_t n) = 0;
@@ -60,18 +47,35 @@ public:
   FileFrameSource(const std::string &path, const FrameParameters &frame_params)
       : FrameSource{frame_params}, ifs_{path} {}
 
+  void seek(ptrdiff_t pos) { ifs_.seekg(pos, std::ifstream::beg); }
+  void clear() { ifs_.clear(); }
+
 private:
   size_t read(char *buf, size_t n) override {
-    ifs_.get(buf, n);
-    // TODO can we return the actual size read
-    return n;
+    if (ifs_.read(buf, n)) {
+      return n;
+    } else {
+      return 0;
+    }
   }
 
   bool eof() const override { return ifs_.eof(); }
 
   bool good() const override { return ifs_.good(); }
-  bool bad() const override { return ifs_.bad(); }
+  bool bad() const { return ifs_.bad(); }
 
   std::ifstream ifs_;
 };
+
+template <> RGBFrame FrameSource::get_frame<RGBFrame>() {
+  // This could also be a template. We wouldn't need frame_params_ if the
+  // caller provided that information via type.
+  auto frame = RGBFrame{frame_params_.width, frame_params_.height};
+  const auto size = frame_size_bytes();
+  if (read(reinterpret_cast<char *>(frame.data()), size) != size) {
+    throw std::runtime_error{"Failed to read frame"};
+  }
+  return frame;
+}
+
 } // namespace camcoder

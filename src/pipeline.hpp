@@ -16,13 +16,13 @@ public:
   Pipeline(const FrameParameters &frame_params);
 
   template <typename TPixel>
-  void push_frame(std::unique_ptr<FrameTmpl<TPixel>> pframe,
+  void push_frame(const FrameTmpl<TPixel> &frame,
                   std::chrono::nanoseconds timestamp) {
     // copy the frame into a Gst::Buffer
     // emit push-buffer signal via Glib::SignalProxy
-    auto framebuf = Gst::Buffer::create(pframe->size_bytes());
-    framebuf->fill(0, reinterpret_cast<gconstpointer>(pframe->data()),
-                   pframe->size_bytes());
+    auto framebuf = Gst::Buffer::create(frame.size_bytes());
+    framebuf->fill(0, reinterpret_cast<gconstpointer>(frame.data()),
+                   frame.size_bytes());
     framebuf->set_dts(timestamp.count());
     // TODO: figure out glibmm SignalProxy
     // See gstreamermm/examples/media_player_getkmm/player_window.cc
@@ -30,7 +30,7 @@ public:
     GstFlowReturn ret = GST_FLOW_ERROR;
     g_signal_emit_by_name(appsrc_->gobj(), "push-buffer", framebuf->gobj(),
                           &ret);
-    std::cout << "Emit buffer" << std::endl;
+    // std::cout << "Emit buffer" << std::endl;
     if (ret < 0) {
       std::cerr << gst_flow_get_name(ret) << std::endl;
     }
