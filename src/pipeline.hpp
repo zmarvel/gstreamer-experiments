@@ -6,6 +6,7 @@
 #include "frame_parameters.hpp"
 #include "frame.hpp"
 #include "config.hpp"
+#include "frame_source.hpp"
 
 namespace camcoder {
 
@@ -14,46 +15,24 @@ public:
   /**
    * Construct and set up the pipeline.
    */
-  Pipeline(const Config &config, const FrameParameters &frame_params);
-
-  template <typename TPixel>
-  void push_frame(const FrameTmpl<TPixel> &frame,
-                  std::chrono::nanoseconds timestamp) {
-    // copy the frame into a Gst::Buffer
-    // emit push-buffer signal via Glib::SignalProxy
-    auto framebuf = Gst::Buffer::create(frame.size_bytes());
-    framebuf->fill(0, reinterpret_cast<gconstpointer>(frame.data()),
-                   frame.size_bytes());
-    framebuf->set_dts(timestamp.count());
-    // TODO: figure out glibmm SignalProxy
-    // See gstreamermm/examples/media_player_getkmm/player_window.cc
-    // for SignalProxy example
-    GstFlowReturn ret = GST_FLOW_ERROR;
-    g_signal_emit_by_name(appsrc_->gobj(), "push-buffer", framebuf->gobj(),
-                          &ret);
-    // std::cout << "Emit buffer" << std::endl;
-    if (ret < 0) {
-      spdlog::error(gst_flow_get_name(ret));
-    }
-  }
+  Pipeline(const Config &config);
 
   void stop() { terminate_ = true; }
 
   bool playing() const { return playing_; }
 
+  void add_frame_source(std::unique_ptr<FrameThread> frame_source);
+
   /**
    * Run the pipeline.
    */
-
-  // TODO: is time point right?
   void operator()();
 
 private:
   void handle_message(Glib::RefPtr<Gst::Message> msg);
 
-  // This lets our app inject data into the pipeline, but we have to tell it
-  // e.g. video format
-  Glib::RefPtr<Gst::Element> appsrc_;
+  static void appsrc_need_data_callback(GstElement *appsrc, guint length,
+                                        gpointer udata);
 
   // Convert format into something the encoder can use
   Glib::RefPtr<Gst::Element> convert_;
@@ -67,5 +46,6 @@ private:
   bool terminate_; /// True when the pipeline should be stopped
   bool playing_;   /// True if the pipeline is in the playing state
   bool ready_;
+  std::vector<std::unique_ptr<FrameThread>> frame_sources_;
 };
 } // namespace camcoder

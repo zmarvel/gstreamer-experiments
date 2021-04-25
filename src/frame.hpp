@@ -53,11 +53,15 @@ public:
 
   constexpr PixelFormat pixel_format() const { return params_.pixel_format; }
 
+  const char *raw_data() { return raw_data_(); }
+
 protected:
   Frame() : params_{} {}
   Frame(const FrameParameters &params) : params_{params} {}
   Frame(const Frame &other) = default;
   Frame &operator=(const Frame &other) = default;
+
+  virtual const char *raw_data_() const = 0;
 
 private:
   FrameParameters params_;
@@ -93,11 +97,9 @@ template <typename TPixel> struct FrameTmpl : public Frame {
   static constexpr size_t pixel_size() { return sizeof(pixel_type); }
   constexpr size_t size_bytes() const { return size_pixels() * pixel_size(); }
 
-  TPixel *data() { return reinterpret_cast<TPixel *>(data_.get()); }
+  TPixel *data() { return data_.get(); }
 
-  const TPixel *data() const {
-    return reinterpret_cast<const TPixel *>(data_.get());
-  }
+  const TPixel *data() const { return data_.get(); }
 
   TPixel &at(size_t x, size_t y) {
     size_t i = y * width() + x;
@@ -136,6 +138,10 @@ template <typename TPixel> struct FrameTmpl : public Frame {
   }
 
 private:
+  const char *raw_data_() const override {
+    return reinterpret_cast<const char *>(data_.get());
+  }
+
   std::unique_ptr<TPixel[]> data_;
 };
 

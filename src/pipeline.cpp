@@ -5,9 +5,8 @@
 
 using namespace camcoder;
 
-Pipeline::Pipeline(const Config &config, const FrameParameters &frame_params)
-    : appsrc_{Gst::ElementFactory::create_element("appsrc")},
-      convert_{Gst::ElementFactory::create_element("videoconvert")},
+Pipeline::Pipeline(const Config &config)
+    : convert_{Gst::ElementFactory::create_element("videoconvert")},
       encoder_{Gst::ElementFactory::create_element("x264enc")},
       // encoder_{Gst::ElementFactory::create_element("vaapih264enc")},
       // encoder_{Gst::ElementFactory::create_element("nvh264enc")},
@@ -16,34 +15,15 @@ Pipeline::Pipeline(const Config &config, const FrameParameters &frame_params)
       pipeline_{Gst::Pipeline::create()},
       terminate_{false}, playing_{false}, ready_{false} {
 
-  // TODO check for null elements
-
-  Gst::VideoInfo video_info;
-  video_info.init();
-  video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB, frame_params.width,
-                        frame_params.height);
-  video_info.set_fps_n(30);
-  video_info.set_fps_d(1);
-  auto video_caps = video_info.to_caps();
-
-  appsrc_->set_property("caps", video_caps);
-  // appsrc_->set_property("format", GST_FORMAT_TIME);
-  appsrc_->set_property("block", true);
-
+  // TODO: check for null elements
   hls_sink_->set_property(
       "location", utils::path_join(config.output_directory, "segment%05d.ts"));
   hls_sink_->set_property(
       "playlist-location",
       utils::path_join(config.output_directory, "playlist.m3u8"));
 
-  // TODO: use signals?
-
-  pipeline_->add(appsrc_)->add(convert_)->add(encoder_)->add(tsmux_)->add(
-      hls_sink_);
-  appsrc_->link(convert_)->link(encoder_)->link(tsmux_)->link(hls_sink_);
-
-  // pipeline_->add(appsrc_)->add(convert_)->add(hls_sink_);
-  // appsrc_->link(convert_)->link(hls_sink_);
+  pipeline_->add(convert_)->add(encoder_)->add(tsmux_)->add(hls_sink_);
+  convert_->link(encoder_)->link(tsmux_)->link(hls_sink_);
 }
 
 void Pipeline::operator()() {
@@ -76,6 +56,30 @@ void Pipeline::operator()() {
   spdlog::info("Pipeline done");
 }
 
+void Pipeline::add_frame_source(std::unique_ptr<FrameThread> frame_source) {
+  auto appsrc = Gst::ElementFactory::create_element("appsrc");
+
+  Gst::VideoInfo video_info;
+  video_info.init();
+  const auto &frame_params = frame_source->frame_parameters();
+  video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB, frame_params.width,
+                        frame_params.height);
+  video_info.set_fps_n(30);
+  video_info.set_fps_d(1);
+  auto video_caps = video_info.to_caps();
+
+  appsrc->set_property("caps", video_caps);
+  // appsrc_->set_property("format", GST_FORMAT_TIME);
+  appsrc->set_property("block", true);
+
+  g_signal_connect(appsrc->gobj(), "need-data",
+                   G_CALLBACK(appsrc_need_data_callback),
+                   reinterpret_cast<gpointer>(frame_source.get()));
+  pipeline_->add(appsrc);
+  appsrc->link(convert_);
+  frame_sources_.push_back(std::move(frame_source));
+}
+
 void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
   switch (msg->get_message_type()) {
   case Gst::MessageType::MESSAGE_ERROR: {
@@ -104,5 +108,27 @@ void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
                   gst_message_type_get_name(
                       static_cast<GstMessageType>(msg->get_message_type())));
     break;
+  }
+}
+
+void Pipeline::appsrc_need_data_callback(GstElement *appsrc, guint length,
+                                         gpointer udata) {
+  auto frame_source = reinterpret_cast<FrameThread *>(udata);
+  auto pframe = frame_source->pop_frame();
+
+  auto framebuf = Gst::Buffer::create(pframe->size_bytes());
+  framebuf->fill(0, pframe->raw_data(), pframe->size_bytes());
+  static Gst::ClockTime frame_count = 0;
+  framebuf->set_dts(frame_count * 32 * 1000000);
+  frame_count++;
+
+  // TODO: figure out glibmm SignalProxy
+  // See gstreamermm/examples/media_player_getkmm/player_window.cc
+  // for SignalProxy example
+  GstFlowReturn ret = GST_FLOW_ERROR;
+  g_signal_emit_by_name(appsrc, "push-buffer", framebuf->gobj(), &ret);
+  spdlog::debug("Emit buffer {}", frame_count);
+  if (ret < 0) {
+    spdlog::error(gst_flow_get_name(ret));
   }
 }

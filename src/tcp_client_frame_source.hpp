@@ -22,18 +22,6 @@ public:
                        const FrameParameters &frame_params)
       : FrameSource{frame_params}, addr_{host, port}, connector_{addr_} {}
 
-  bool connect() {
-    // if sockpp::connector.connect() is called twice, it will break the
-    // connection and reconnect.
-    if (connected()) {
-      return true;
-    } else {
-      return connector_.connect(addr_);
-    }
-  }
-
-  bool connected() const { return connector_.is_connected(); }
-
 private:
   size_t read(char *buf, size_t n) override {
     if (!connected()) {
@@ -42,8 +30,20 @@ private:
     return connector_.read_n(buf, n);
   }
   bool eof() const override { return false; }
-  bool good() const override { return connected(); }
-  bool bad() const override { return !connected(); }
+  bool good() const override { return connected_(); }
+  bool bad() const override { return !connected_(); }
+
+  bool connected_() const override { return connector_.is_connected(); }
+
+  bool connect_() override {
+    // if sockpp::connector.connect() is called twice, it will break the
+    // connection and reconnect.
+    if (connected()) {
+      return true;
+    } else {
+      return connector_.connect(addr_);
+    }
+  }
 
   typename TConnector::addr_t addr_;
   TConnector connector_;

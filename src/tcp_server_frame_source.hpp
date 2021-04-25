@@ -16,12 +16,6 @@ public:
         client_sock_{}, client_addr_{} {}
   // TODO: constructor without specific address
 
-  bool connected() const { return client_sock_.is_open(); }
-  bool accept() {
-    client_sock_ = acceptor_.accept(&client_addr_);
-    return client_sock_.is_open();
-  }
-
 private:
   size_t read(char *buf, size_t n) override {
     if (!connected()) {
@@ -31,8 +25,14 @@ private:
     }
   }
   bool eof() const override { return false; }
-  bool good() const override { return connected(); }
-  bool bad() const override { return !connected(); }
+  bool good() const override { return connected_(); }
+  bool bad() const override { return !connected_(); }
+
+  bool connected_() const override { return client_sock_.is_open(); }
+  bool connect_() override {
+    client_sock_ = acceptor_.accept(&client_addr_);
+    return client_sock_.is_open();
+  }
 
 private:
   typename TAcceptor::addr_t addr_;
@@ -40,7 +40,6 @@ private:
   sockpp::stream_socket client_sock_;
   typename TAcceptor::addr_t client_addr_;
 };
-
 } // namespace detail
 
 using TCPServerFrameSource = detail::TCPServerFrameSource<sockpp::tcp_acceptor>;

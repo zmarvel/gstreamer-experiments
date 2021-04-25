@@ -39,41 +39,6 @@ RGBFrame generate_frame(int i) {
   return os;
 }
 
-// TODO: probably no need for two threads and a queue; reading from the frame
-// source and writing to the Gst element already block
-static void frame_producer_thread() {
-  using namespace std::chrono_literals;
-  TCPServerFrameSource frame_source{"127.0.0.1", 9000, frame_params};
-  int i = 0;
-  while (true) {
-    if (!frame_source.connected()) {
-      frame_source.accept();
-    }
-    i++;
-    auto frame = frame_source.get_frame<RGBFrame>();
-    frame_q.add(std::move(frame));
-  }
-  frame_q.complete_adding();
-  spdlog::info("Producer done");
-}
-
-static void frame_consumer_thread(Pipeline &p) {
-  // frame_q is completed when complete_adding() has been called and the queue
-  // is empty
-  int i = 0;
-  while (!frame_q.is_completed()) {
-    RGBFrame frame;
-    frame_q.take(frame);
-    // std::cout << "Popped " << frame.size_bytes() << " B" << std::endl;
-    assert(frame.size_bytes() == 3 * 640 * 480);
-    using namespace std::chrono_literals;
-    p.push_frame(frame, i * 32ms);
-    i++;
-  }
-  p.stop();
-  spdlog::info("Consumer done");
-}
-
 static cag_option options[] = {{
                                    .identifier = 'c',
                                    .access_letters = "c",
@@ -90,12 +55,6 @@ static cag_option options[] = {{
                                }};
 
 int main(int argc, char *argv[]) {
-  // Only needed if we're writing socket code, but for now we'll assume it
-  // doesn't hurt to initialize it.
-  sockpp::socket_initializer{};
-
-  Gst::init();
-
   const char *config_path = "camcoder.toml";
 
   cag_option_context option_ctx{};
@@ -113,14 +72,18 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  spdlog::info("Using log at {}", config_path);
-
+  spdlog::info("Using config at {}", config_path);
   Config config{config_path};
-  Pipeline p{config, frame_params};
-  std::thread pipeline_thread{std::ref(p)};
-  std::thread consumer_thread{frame_consumer_thread, std::ref(p)};
-  std::thread producer_thread{frame_producer_thread};
-  producer_thread.join();
-  consumer_thread.join();
-  pipeline_thread.join();
+
+  // Only needed if we're writing socket code, but for now we'll assume it
+  // doesn't hurt to initialize it.
+  sockpp::socket_initializer{};
+
+  Gst::init();
+
+  Pipeline p{config};
+  auto pframe_source = std::make_unique<FrameThread>(
+      std::make_unique<TCPServerFrameSource>("127.0.0.1", 9000, frame_params));
+  p.add_frame_source(std::move(pframe_source));
+  p();
 }
