@@ -2,10 +2,11 @@
 #include <iostream>
 
 #include "pipeline.hpp"
+#include "utils.hpp"
 
 using namespace camcoder;
 
-Pipeline::Pipeline(const FrameParameters &frame_params)
+Pipeline::Pipeline(const Config &config, const FrameParameters &frame_params)
     : appsrc_{Gst::ElementFactory::create_element("appsrc")},
       convert_{Gst::ElementFactory::create_element("videoconvert")},
       encoder_{Gst::ElementFactory::create_element("x264enc")},
@@ -29,6 +30,12 @@ Pipeline::Pipeline(const FrameParameters &frame_params)
   appsrc_->set_property("caps", video_caps);
   // appsrc_->set_property("format", GST_FORMAT_TIME);
   appsrc_->set_property("block", true);
+
+  hls_sink_->set_property(
+      "location", utils::path_join(config.output_directory, "segment%05d.ts"));
+  hls_sink_->set_property(
+      "playlist-location",
+      utils::path_join(config.output_directory, "playlist.m3u8"));
 
   // TODO: use signals?
 

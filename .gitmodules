@@ -4,3 +4,6 @@
 [submodule "lib/BlockingCollection"]
 	path = lib/BlockingCollection
 	url = https://github.com/CodeExMachina/BlockingCollection.git
+[submodule "lib/toml11"]
+	path = lib/toml11
+	url = https://github.com/ToruNiina/toml11.git

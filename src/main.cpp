@@ -7,6 +7,7 @@
 
 #include "pipeline.hpp"
 #include "tcp_server_frame_source.hpp"
+#include "config.hpp"
 
 using namespace camcoder;
 
@@ -29,7 +30,8 @@ RGBFrame generate_frame(int i) {
 }
 #endif
 
-static std::ostream &operator<<(std::ostream &os, const RGBPixel &pix) {
+[[maybe_unused]] static std::ostream &operator<<(std::ostream &os,
+                                                 const RGBPixel &pix) {
   os << static_cast<uint32_t>(pix.r) << " " << static_cast<uint32_t>(pix.g)
      << " " << static_cast<uint32_t>(pix.b);
   return os;
@@ -68,13 +70,20 @@ static void frame_consumer_thread(Pipeline &p) {
   std::cout << "Consumer done" << std::endl;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   // Only needed if we're writing socket code, but for now we'll assume it
   // doesn't hurt to initialize it.
   sockpp::socket_initializer{};
 
   Gst::init();
-  Pipeline p{frame_params};
+
+  const char *config_path = "camcoder.toml";
+  if (argc == 2) {
+    config_path = argv[1];
+  }
+
+  Config config{config_path};
+  Pipeline p{config, frame_params};
   std::thread pipeline_thread{std::ref(p)};
   std::thread consumer_thread{frame_consumer_thread, std::ref(p)};
   std::thread producer_thread{frame_producer_thread};

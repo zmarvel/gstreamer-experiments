@@ -7,7 +7,8 @@ enum class PixelFormat {
   RGB = 1,
 };
 
-static std::string pixel_format_to_string(PixelFormat format) {
+[[maybe_unused]] static constexpr const char *
+pixel_format_to_string(PixelFormat format) {
   switch (format) {
   case PixelFormat::INVALID:
     return {};

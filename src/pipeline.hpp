@@ -5,6 +5,7 @@
 
 #include "frame_parameters.hpp"
 #include "frame.hpp"
+#include "config.hpp"
 
 namespace camcoder {
 
@@ -13,7 +14,7 @@ public:
   /**
    * Construct and set up the pipeline.
    */
-  Pipeline(const FrameParameters &frame_params);
+  Pipeline(const Config &config, const FrameParameters &frame_params);
 
   template <typename TPixel>
   void push_frame(const FrameTmpl<TPixel> &frame,
