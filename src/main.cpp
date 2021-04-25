@@ -5,6 +5,7 @@
 #include <sockpp/socket.h>
 #include <spdlog/spdlog.h>
 #include "BlockingCollection.h"
+#include <cargs.h>
 
 #include "pipeline.hpp"
 #include "tcp_server_frame_source.hpp"
@@ -73,6 +74,21 @@ static void frame_consumer_thread(Pipeline &p) {
   spdlog::info("Consumer done");
 }
 
+static cag_option options[] = {{
+                                   .identifier = 'c',
+                                   .access_letters = "c",
+                                   .access_name = "config",
+                                   .value_name = "CONFIG_PATH",
+                                   .description = "Path to config file",
+                               },
+                               {
+                                   .identifier = 'h',
+                                   .access_letters = "h",
+                                   .access_name = "help",
+                                   .value_name = nullptr,
+                                   .description = "Show the command usage",
+                               }};
+
 int main(int argc, char *argv[]) {
   // Only needed if we're writing socket code, but for now we'll assume it
   // doesn't hurt to initialize it.
@@ -81,8 +97,20 @@ int main(int argc, char *argv[]) {
   Gst::init();
 
   const char *config_path = "camcoder.toml";
-  if (argc == 2) {
-    config_path = argv[1];
+
+  cag_option_context option_ctx{};
+  cag_option_prepare(&option_ctx, options, CAG_ARRAY_SIZE(options), argc, argv);
+
+  while (cag_option_fetch(&option_ctx)) {
+    switch (cag_option_get(&option_ctx)) {
+    case 'c':
+      config_path = cag_option_get_value(&option_ctx);
+      break;
+    case 'h':
+      std::cout << "Usage: camcoder [OPTION] ..." << std::endl;
+      cag_option_print(options, CAG_ARRAY_SIZE(options), stdout);
+      return 0;
+    }
   }
 
   spdlog::info("Using log at {}", config_path);

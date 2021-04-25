@@ -10,3 +10,6 @@
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "lib/cargs"]
+	path = lib/cargs
+	url = https://github.com/likle/cargs.git
