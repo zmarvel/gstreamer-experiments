@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include <sockpp/socket.h>
+#include <spdlog/spdlog.h>
 #include "BlockingCollection.h"
 
 #include "pipeline.hpp"
@@ -37,6 +38,8 @@ RGBFrame generate_frame(int i) {
   return os;
 }
 
+// TODO: probably no need for two threads and a queue; reading from the frame
+// source and writing to the Gst element already block
 static void frame_producer_thread() {
   using namespace std::chrono_literals;
   TCPServerFrameSource frame_source{"127.0.0.1", 9000, frame_params};
@@ -50,7 +53,7 @@ static void frame_producer_thread() {
     frame_q.add(std::move(frame));
   }
   frame_q.complete_adding();
-  std::cout << "Producer done" << std::endl;
+  spdlog::info("Producer done");
 }
 
 static void frame_consumer_thread(Pipeline &p) {
@@ -67,7 +70,7 @@ static void frame_consumer_thread(Pipeline &p) {
     i++;
   }
   p.stop();
-  std::cout << "Consumer done" << std::endl;
+  spdlog::info("Consumer done");
 }
 
 int main(int argc, char *argv[]) {
@@ -81,6 +84,8 @@ int main(int argc, char *argv[]) {
   if (argc == 2) {
     config_path = argv[1];
   }
+
+  spdlog::info("Using log at {}", config_path);
 
   Config config{config_path};
   Pipeline p{config, frame_params};

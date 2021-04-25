@@ -1,7 +1,7 @@
 #include <fstream>
-#include <iostream>
 
 #include <toml.hpp>
+#include <spdlog/spdlog.h>
 
 #include "config.hpp"
 
@@ -13,8 +13,7 @@ Config::Config(const std::string &path) : Config{std::ifstream{path}, path} {}
 
 Config::Config(std::istream &&is, const std::string &path) : Config{} {
   if (!is) {
-    std::cerr << "Failed to load config from " << path
-              << "; defaults will be used" << std::endl;
+    spdlog::warn("Failed to load config from {}; defaults will be used", path);
     return;
   }
 

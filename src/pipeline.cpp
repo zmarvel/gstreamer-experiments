@@ -1,5 +1,4 @@
-
-#include <iostream>
+#include <spdlog/spdlog.h>
 
 #include "pipeline.hpp"
 #include "utils.hpp"
@@ -52,7 +51,7 @@ void Pipeline::operator()() {
       Gst::StateChangeReturn::STATE_CHANGE_FAILURE) {
     throw std::runtime_error{"Failed to change to playing state"};
   }
-  std::cout << "Pipeline start" << std::endl;
+  spdlog::info("Pipeline starting");
 
   // Gst::Task
   // Gst::Buffer;
@@ -74,20 +73,19 @@ void Pipeline::operator()() {
     }
   }
   pipeline_->set_state(Gst::State::STATE_NULL);
-  std::cout << "Pipeline done" << std::endl;
+  spdlog::info("Pipeline done");
 }
 
 void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
   switch (msg->get_message_type()) {
   case Gst::MessageType::MESSAGE_ERROR: {
     auto err = Glib::RefPtr<Gst::MessageError>::cast_static(msg);
-    std::cerr << "Error from " << msg->get_source()->get_name() << ": "
-              << err->parse_error().what() << std::endl
-              << "Debug information: " << err->parse_debug() << std::endl;
+    spdlog::error("Error from {}:", msg->get_source()->get_name().raw());
+    spdlog::error("Debug information: {}", err->parse_debug());
     terminate_ = true;
   } break;
   case Gst::MessageType::MESSAGE_EOS: {
-    std::cout << "Reached end of stream" << std::endl;
+    spdlog::info("Reached end of stream");
     terminate_ = true;
   } break;
   case Gst::MessageType::MESSAGE_STATE_CHANGED: {
@@ -95,17 +93,16 @@ void Pipeline::handle_message(Glib::RefPtr<Gst::Message> msg) {
       auto err = Glib::RefPtr<Gst::MessageStateChanged>::cast_static(msg);
       auto old_state = err->parse_old_state();
       auto new_state = err->parse_new_state();
-      std::cout << "Pipeline state changed from " << old_state << " to "
-                << new_state << std::endl;
+      spdlog::debug("Pipeline state changed from {} to {}", old_state,
+                    new_state);
       ready_ = new_state == Gst::State::STATE_READY;
       playing_ = new_state == Gst::State::STATE_PLAYING;
     }
   } break;
   default:
-    std::cerr << "Unrecognized message type "
-              << gst_message_type_get_name(
-                     static_cast<GstMessageType>(msg->get_message_type()))
-              << std::endl;
+    spdlog::error("Unrecognized message type {}",
+                  gst_message_type_get_name(
+                      static_cast<GstMessageType>(msg->get_message_type())));
     break;
   }
 }

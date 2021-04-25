@@ -13,6 +13,7 @@ endif (BUILD_TUTORIALS)
 
 add_subdirectory(lib/sockpp)
 add_subdirectory(lib/toml11)
+add_subdirectory(lib/spdlog)
 
 add_library(BlockingCollection INTERFACE)
 target_include_directories(BlockingCollection INTERFACE lib/BlockingCollection)
@@ -21,4 +22,4 @@ add_compile_options(-Wall -Wextra)
 
 add_subdirectory(src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE sockpp toml11)
+target_link_libraries(${PROJECT_NAME} PRIVATE sockpp toml11 spdlog)

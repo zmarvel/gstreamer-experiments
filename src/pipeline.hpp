@@ -1,5 +1,5 @@
 #pragma once
-#include <iostream>
+
 #include <gstreamermm.h>
 #include <chrono>
 
@@ -33,14 +33,11 @@ public:
                           &ret);
     // std::cout << "Emit buffer" << std::endl;
     if (ret < 0) {
-      std::cerr << gst_flow_get_name(ret) << std::endl;
+      spdlog::error(gst_flow_get_name(ret));
     }
   }
 
-  void stop() {
-    std::cout << "stop()" << std::endl;
-    terminate_ = true;
-  }
+  void stop() { terminate_ = true; }
 
   bool playing() const { return playing_; }
 
