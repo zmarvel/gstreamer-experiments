@@ -60,9 +60,7 @@ public:
   static constexpr size_t DEFAULT_QUEUE_SIZE = 128;
 
   FrameThread(std::unique_ptr<FrameSource> frame_source,
-              size_t queue_size = DEFAULT_QUEUE_SIZE)
-      : frame_source_{std::move(frame_source)},
-        frame_count_{0}, frame_q_{queue_size}, thread_{std::ref(*this)} {}
+              size_t queue_size = DEFAULT_QUEUE_SIZE);
 
   // This should let us do e.g.
   //   FrameThread frame_thread{TCPServerFrameSource{...}}
@@ -75,31 +73,13 @@ public:
   //     : FrameThread{std::make_unique<TFrameSource>(frame_source), queue_size}
   //     {}
 
-  constexpr size_t frame_count() const { return frame_count_; }
+  constexpr size_t frame_count() const;
 
-  void operator()() {
-    spdlog::info("Frame source started");
-    while (!frame_source_->finished()) {
-      if (!frame_source_->connected()) {
-        frame_source_->connect();
-      }
-      frame_q_.add(std::move(frame_source_->get_frame_ptr()));
-      frame_count_++;
-    }
-    frame_q_.complete_adding();
-    // TODO: thread name
-    spdlog::info("Frame source done");
-  }
+  void operator()();
 
-  std::unique_ptr<Frame> pop_frame() {
-    std::unique_ptr<Frame> pframe;
-    frame_q_.take(pframe);
-    return pframe;
-  }
+  std::unique_ptr<Frame> pop_frame();
 
-  FrameParameters frame_parameters() const {
-    return frame_source_->frame_parameters();
-  }
+  FrameParameters frame_parameters() const;
 
 private:
   std::unique_ptr<FrameSource> frame_source_;

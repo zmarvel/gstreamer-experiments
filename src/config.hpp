@@ -6,6 +6,8 @@
 #include <istream>
 #include <string_view>
 
+#include <toml.hpp>
+
 #include "frame_parameters.hpp"
 
 namespace camcoder {
@@ -24,6 +26,7 @@ enum class FrameSourceType {
  * Configuration for a single frame source.
  */
 struct FrameSourceConfig {
+  std::string name;
   FrameSourceType type;
   /**
    * Frame parameters (width, height, pixel type).
@@ -33,7 +36,7 @@ struct FrameSourceConfig {
   /**
    * Options specific to each type of frame source.
    */
-  std::map<std::string, std::string> options;
+  const toml::table &options;
 };
 
 /**
@@ -64,6 +67,7 @@ public:
   std::vector<FrameSourceConfig> frame_sources;
 
 private:
+  toml::value root_;
   bool loaded_;
 };
 

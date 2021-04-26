@@ -22,6 +22,40 @@ public:
                        const FrameParameters &frame_params)
       : FrameSource{frame_params}, addr_{host, port}, connector_{addr_} {}
 
+  static std::unique_ptr<TCPClientFrameSource>
+  from_config(const FrameSourceConfig &config) {
+    const auto host = config.options.find("host");
+    std::string addr_host{};
+    if (host == config.options.end()) {
+      spdlog::warn("No host specified for source {}; using 127.0.0.1",
+                   config.name);
+      addr_host = "127.0.0.1";
+    } else {
+      addr_host = host->second.as_string();
+    }
+
+    const auto port = config.options.find("port");
+    if (port == config.options.end()) {
+      spdlog::error("Port is required for source {}", config.name);
+      return nullptr;
+    }
+    const auto addr_port = port->second.as_integer();
+    if (addr_port <= 0 ||
+        addr_port > std::numeric_limits<std::uint16_t>::max()) {
+      spdlog::error("Invalid port {} for source {}", addr_port, config.name);
+      return nullptr;
+    }
+
+    spdlog::info("Creating TCPClientFrameSource<host={}, port={}>", addr_host,
+                 addr_port);
+
+    return std::make_unique<TCPClientFrameSource>(
+        addr_host, static_cast<std::uint16_t>(addr_port), config.frame_params);
+  }
+
+  std::string host() const { return addr_.to_string(); }
+  std::uint16_t port() const { return addr_.port(); }
+
 private:
   size_t read(char *buf, size_t n) override {
     if (!connected()) {

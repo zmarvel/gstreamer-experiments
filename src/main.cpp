@@ -8,7 +8,9 @@
 #include <cargs.h>
 
 #include "pipeline.hpp"
+#include "file_frame_source.hpp"
 #include "tcp_server_frame_source.hpp"
+#include "tcp_client_frame_source.hpp"
 #include "config.hpp"
 
 using namespace camcoder;
@@ -47,6 +49,13 @@ static cag_option options[] = {{
                                    .description = "Path to config file",
                                },
                                {
+                                   .identifier = 'v',
+                                   .access_letters = "v",
+                                   .access_name = "verbose",
+                                   .value_name = nullptr,
+                                   .description = "Enable verbose output",
+                               },
+                               {
                                    .identifier = 'h',
                                    .access_letters = "h",
                                    .access_name = "help",
@@ -65,6 +74,9 @@ int main(int argc, char *argv[]) {
     case 'c':
       config_path = cag_option_get_value(&option_ctx);
       break;
+    case 'v':
+      spdlog::set_level(spdlog::level::debug);
+      break;
     case 'h':
       std::cout << "Usage: camcoder [OPTION] ..." << std::endl;
       cag_option_print(options, CAG_ARRAY_SIZE(options), stdout);
@@ -82,8 +94,31 @@ int main(int argc, char *argv[]) {
   Gst::init();
 
   Pipeline p{config};
-  auto pframe_source = std::make_unique<FrameThread>(
-      std::make_unique<TCPServerFrameSource>("127.0.0.1", 9000, frame_params));
-  p.add_frame_source(std::move(pframe_source));
+
+  for (const auto &conf : config.frame_sources) {
+    std::unique_ptr<FrameSource> pframe_source{nullptr};
+    switch (conf.type) {
+    case FrameSourceType::FILE:
+      pframe_source = FileFrameSource::from_config(conf);
+      break;
+    case FrameSourceType::TCP_CLIENT:
+      pframe_source = TCPClientFrameSource::from_config(conf);
+      break;
+    case FrameSourceType::TCP_SERVER:
+      pframe_source = TCPServerFrameSource::from_config(conf);
+      break;
+    default:
+      break;
+    }
+    if (pframe_source != nullptr) {
+      auto pframe_thread =
+          std::make_unique<FrameThread>(std::move(pframe_source));
+      p.add_frame_source(std::move(pframe_thread));
+    } else {
+      spdlog::warn("Failed to construct frame source from config for {}",
+                   conf.name);
+    }
+  }
+
   p();
 }

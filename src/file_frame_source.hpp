@@ -1,49 +1,37 @@
 #pragma once
 
 #include "frame_source.hpp"
+#include "config.hpp"
 
 namespace camcoder {
 
 class FileFrameSource : public FrameSource {
 public:
-  FileFrameSource(const std::string &path, const FrameParameters &frame_params)
-      : FrameSource{frame_params}, ifs_{path}, loop_{false} {}
+  FileFrameSource(const std::string &path, const FrameParameters &frame_params);
 
-  bool seek(ptrdiff_t pos) {
-    if (ifs_.eof()) {
-      ifs_.clear(ifs_.rdstate() & (~std::ifstream::eofbit));
-    }
-    ifs_.seekg(pos, std::ifstream::beg);
-    return ifs_.good();
-  }
+  static std::unique_ptr<FileFrameSource>
+  from_config(const FrameSourceConfig &config);
 
-  void enable_loop(bool enabled) { loop_ = enabled; }
+  bool seek(ptrdiff_t pos);
+
+  void enable_loop(bool enabled);
+
+  const std::string& path() const { return path_;}
 
 private:
-  size_t read(char *buf, size_t n) override {
-    if (ifs_.read(buf, n)) {
-      return n;
-    } else {
-      return 0;
-    }
-  }
+  size_t read(char *buf, size_t n) override;
 
-  bool eof() const override { return ifs_.eof(); }
+  bool eof() const override;
 
-  bool good() const override { return ifs_.good(); }
+  bool good() const override;
 
-  bool bad() const override { return ifs_.bad(); }
+  bool bad() const override;
 
-  bool connected_() const override { return !eof(); }
+  bool connected_() const override;
 
-  bool connect_() override {
-    if (loop_ && eof()) {
-      return seek(0);
-    } else {
-      return connected_();
-    }
-  }
+  bool connect_() override;
 
+std::string path_;
   std::ifstream ifs_;
   bool loop_;
 };
