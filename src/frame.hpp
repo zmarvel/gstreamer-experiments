@@ -53,11 +53,14 @@ public:
 
   constexpr PixelFormat pixel_format() const { return params_.pixel_format; }
 
+  constexpr std::uint64_t frame_number() const { return frame_number_; }
+
   const char *raw_data() { return raw_data_(); }
 
 protected:
-  Frame() : params_{} {}
-  Frame(const FrameParameters &params) : params_{params} {}
+  constexpr Frame() : params_{}, frame_number_{0} {}
+  constexpr Frame(const FrameParameters &params, std::uint64_t frame_number)
+      : params_{params}, frame_number_{frame_number} {}
   Frame(const Frame &other) = default;
   Frame &operator=(const Frame &other) = default;
 
@@ -65,13 +68,14 @@ protected:
 
 private:
   FrameParameters params_;
+  std::uint64_t frame_number_;
 };
 
 // No use specifying frame parameters at compile time since they'll be
 // determined by a config
 template <typename TPixel> struct FrameTmpl : public Frame {
-  FrameTmpl(size_t width, size_t height)
-      : Frame{{width, height, TPixel::format()}},
+  FrameTmpl(size_t width, size_t height, std::uint64_t frame_number)
+      : Frame{{width, height, TPixel::format()}, frame_number},
         data_{new TPixel[size_bytes()]} {}
 
   FrameTmpl() : Frame{}, data_{nullptr} {}
@@ -83,7 +87,8 @@ template <typename TPixel> struct FrameTmpl : public Frame {
   // Only move
   // Move constructor
   FrameTmpl(FrameTmpl<TPixel> &&other)
-      : Frame{other.params()}, data_{std::move(other.data_)} {}
+      : Frame{other.params(), other.frame_number()}, data_{std::move(
+                                                         other.data_)} {}
 
   // Move assignment operator
   FrameTmpl &operator=(FrameTmpl<TPixel> &&other) {

@@ -26,12 +26,22 @@ enum class FrameSourceType {
  * Configuration for a single frame source.
  */
 struct FrameSourceConfig {
+  /**
+   * Unique name.
+   */
   std::string name;
+
+  /**
+   * Corresponds to a subclass of FrameSource.
+   */
   FrameSourceType type;
+
   /**
    * Frame parameters (width, height, pixel type).
    */
   FrameParameters frame_params;
+
+  FrameRate frame_rate;
 
   /**
    * Options specific to each type of frame source.

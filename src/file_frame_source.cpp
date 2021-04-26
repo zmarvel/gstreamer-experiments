@@ -5,8 +5,10 @@
 using namespace camcoder;
 
 FileFrameSource::FileFrameSource(const std::string &path,
-                                 const FrameParameters &frame_params)
-    : FrameSource{frame_params}, path_{path}, ifs_{path}, loop_{false} {}
+                                 const FrameParameters &frame_params,
+                                 const FrameRate &frame_rate)
+    : FrameSource{frame_params, frame_rate}, path_{path}, ifs_{path},
+      loop_{false} {}
 
 std::unique_ptr<FileFrameSource>
 FileFrameSource::from_config(const FrameSourceConfig &config) {
@@ -18,7 +20,7 @@ FileFrameSource::from_config(const FrameSourceConfig &config) {
   }
 
   auto frame_source = std::make_unique<FileFrameSource>(
-      path_it->second.as_string(), config.frame_params);
+      path_it->second.as_string(), config.frame_params, config.frame_rate);
 
   const auto loop_it = config.options.find("loop");
   if (loop_it != config.options.end()) {
@@ -32,10 +34,9 @@ FileFrameSource::from_config(const FrameSourceConfig &config) {
 }
 
 bool FileFrameSource::seek(ptrdiff_t pos) {
-  // if (ifs_.eof()) {
-  // ifs_.clear(ifs_.rdstate() & (~std::ifstream::eofbit));
-  // }
-  ifs_.clear();
+  if (ifs_.eof()) {
+    ifs_.clear(ifs_.rdstate() & (~std::ifstream::eofbit));
+  }
   ifs_.seekg(pos, std::ifstream::beg);
   return ifs_.good();
 }

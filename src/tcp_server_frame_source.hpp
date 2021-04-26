@@ -17,9 +17,10 @@ class TCPServerFrameSource : public FrameSource {
 
 public:
   TCPServerFrameSource(const std::string &addr, std::uint16_t port,
-                       const FrameParameters &frame_params)
-      : FrameSource{frame_params}, addr_{addr, port}, acceptor_{addr_},
-        client_sock_{}, client_addr_{} {}
+                       const FrameParameters &frame_params,
+                       const FrameRate &frame_rate = {0, 1})
+      : FrameSource{frame_params, frame_rate}, addr_{addr, port},
+        acceptor_{addr_}, client_sock_{}, client_addr_{} {}
   // TODO: constructor without specific address
 
   static std::unique_ptr<TCPServerFrameSource>
@@ -50,7 +51,8 @@ public:
                  addr_port);
 
     return std::make_unique<TCPServerFrameSource>(
-        addr_host, static_cast<std::uint16_t>(addr_port), config.frame_params);
+        addr_host, static_cast<std::uint16_t>(addr_port), config.frame_params,
+        config.frame_rate);
   }
 
 private:

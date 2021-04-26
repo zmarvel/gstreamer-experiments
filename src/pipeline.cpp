@@ -64,12 +64,14 @@ void Pipeline::add_frame_source(std::unique_ptr<FrameThread> frame_source) {
   const auto &frame_params = frame_source->frame_parameters();
   video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB, frame_params.width,
                         frame_params.height);
-  video_info.set_fps_n(30);
-  video_info.set_fps_d(1);
+  const auto frame_rate = frame_source->frame_rate();
+  video_info.set_fps_n(frame_rate.numerator);
+  video_info.set_fps_d(frame_rate.denominator);
+  spdlog::info("Using frame rate {}/{}", frame_rate.numerator,
+               frame_rate.denominator);
   auto video_caps = video_info.to_caps();
 
   appsrc->set_property("caps", video_caps);
-  // appsrc_->set_property("format", GST_FORMAT_TIME);
   appsrc->set_property("block", true);
 
   g_signal_connect(appsrc->gobj(), "need-data",
@@ -118,16 +120,16 @@ void Pipeline::appsrc_need_data_callback(GstElement *appsrc, guint length,
 
   auto framebuf = Gst::Buffer::create(pframe->size_bytes());
   framebuf->fill(0, pframe->raw_data(), pframe->size_bytes());
-  static Gst::ClockTime frame_count = 0;
-  framebuf->set_dts(frame_count * 32 * 1000000);
-  frame_count++;
+  const auto frame_rate = frame_source->frame_rate();
+  framebuf->set_duration(frame_rate.denominator * 1e9 / frame_rate.numerator);
+  framebuf->set_dts(pframe->frame_number() *
+                    (frame_rate.denominator * 1e9 / frame_rate.numerator));
 
   // TODO: figure out glibmm SignalProxy
   // See gstreamermm/examples/media_player_getkmm/player_window.cc
   // for SignalProxy example
   GstFlowReturn ret = GST_FLOW_ERROR;
   g_signal_emit_by_name(appsrc, "push-buffer", framebuf->gobj(), &ret);
-  spdlog::debug("Emit buffer {}", frame_count);
   if (ret < 0) {
     spdlog::error(gst_flow_get_name(ret));
   }

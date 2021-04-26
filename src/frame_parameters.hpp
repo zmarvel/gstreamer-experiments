@@ -25,4 +25,17 @@ struct FrameParameters {
   PixelFormat pixel_format;
 };
 
+/**
+ * Represents a frame rate in Hz.
+ */
+struct FrameRate {
+  constexpr FrameRate(std::uint32_t numerator_, uint32_t denominator_)
+      : numerator{numerator_}, denominator{denominator_} {}
+
+  constexpr FrameRate() : FrameRate{0, 1} {}
+
+  std::uint32_t numerator;
+  std::uint32_t denominator;
+};
+
 } // namespace camcoder

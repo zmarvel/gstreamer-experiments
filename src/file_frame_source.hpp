@@ -7,7 +7,8 @@ namespace camcoder {
 
 class FileFrameSource : public FrameSource {
 public:
-  FileFrameSource(const std::string &path, const FrameParameters &frame_params);
+  FileFrameSource(const std::string &path, const FrameParameters &frame_params,
+                  const FrameRate &frame_rate = {0, 1});
 
   static std::unique_ptr<FileFrameSource>
   from_config(const FrameSourceConfig &config);
@@ -16,7 +17,7 @@ public:
 
   void enable_loop(bool enabled);
 
-  const std::string& path() const { return path_;}
+  const std::string &path() const { return path_; }
 
 private:
   size_t read(char *buf, size_t n) override;
@@ -31,7 +32,7 @@ private:
 
   bool connect_() override;
 
-std::string path_;
+  std::string path_;
   std::ifstream ifs_;
   bool loop_;
 };

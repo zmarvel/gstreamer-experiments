@@ -19,8 +19,10 @@ class TCPClientFrameSource : public FrameSource {
 public:
   // TODO: Does this do hostname resolution?
   TCPClientFrameSource(const std::string &host, std::uint16_t port,
-                       const FrameParameters &frame_params)
-      : FrameSource{frame_params}, addr_{host, port}, connector_{addr_} {}
+                       const FrameParameters &frame_params,
+                       const FrameRate &frame_rate = {0, 1})
+      : FrameSource{frame_params, frame_rate}, addr_{host, port}, connector_{
+                                                                      addr_} {}
 
   static std::unique_ptr<TCPClientFrameSource>
   from_config(const FrameSourceConfig &config) {
@@ -50,7 +52,8 @@ public:
                  addr_port);
 
     return std::make_unique<TCPClientFrameSource>(
-        addr_host, static_cast<std::uint16_t>(addr_port), config.frame_params);
+        addr_host, static_cast<std::uint16_t>(addr_port), config.frame_params,
+        config.frame_rate);
   }
 
   std::string host() const { return addr_.to_string(); }

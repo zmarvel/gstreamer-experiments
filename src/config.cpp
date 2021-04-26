@@ -82,6 +82,27 @@ Config::Config(std::istream &&is, const std::string &path) : Config{} {
       frame_params.width = frame_size[0];
       frame_params.height = frame_size[1];
 
+      FrameRate frame_rate{};
+      if (source_node.contains("frame_rate")) {
+        const auto frame_rate_node = toml::find(source_node, "frame_rate");
+        if (frame_rate_node.is_integer()) {
+          frame_rate.numerator = frame_rate_node.as_integer();
+        } else {
+          const auto frame_rate_array = frame_rate_node.as_array();
+          if (frame_rate_array.size() == 1) {
+            frame_rate.numerator = frame_rate_array.at(0).as_integer();
+          } else if (frame_rate_array.size() == 2 &&
+                     frame_rate_array.at(1).as_integer() != 0) {
+            frame_rate.numerator = frame_rate_array.at(0).as_integer();
+            frame_rate.denominator = frame_rate_array.at(1).as_integer();
+          } else {
+            spdlog::error(
+                "Source node {} has invalid frame rate numerator/denominator",
+                source_name);
+          }
+        }
+      }
+
       const auto pixel_format_name =
           toml::find<std::string>(source_node, "pixel_format");
       const auto pixel_format =
@@ -93,12 +114,11 @@ Config::Config(std::istream &&is, const std::string &path) : Config{} {
       }
       frame_params.pixel_format = pixel_format->second;
 
-      // TODO: frame_rate
-
       frame_sources.push_back(FrameSourceConfig{
           .name = source_name,
           .type = type->second,
           .frame_params = frame_params,
+          .frame_rate = frame_rate,
           .options = source_node.as_table(),
       });
     }
