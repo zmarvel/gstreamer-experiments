@@ -39,6 +39,8 @@ static constexpr size_t pixel_size(PixelFormat format) {
 
 class Frame {
 public:
+  using Timestamp = std::chrono::nanoseconds;
+
   virtual ~Frame() = default;
 
   constexpr size_t width() const { return params_.width; }
@@ -55,12 +57,20 @@ public:
 
   constexpr std::uint64_t frame_number() const { return frame_number_; }
 
+  constexpr Timestamp timestamp() const { return timestamp_; }
+
+  void set_timestamp(Timestamp timestamp) { timestamp_ = timestamp; }
+
   const char *raw_data() { return raw_data_(); }
 
 protected:
-  constexpr Frame() : params_{}, frame_number_{0} {}
+  constexpr Frame() : Frame{{}, {}, {}} {}
   constexpr Frame(const FrameParameters &params, std::uint64_t frame_number)
-      : params_{params}, frame_number_{frame_number} {}
+      : Frame{params, frame_number, {}} {}
+  constexpr Frame(const FrameParameters &params, std::uint64_t frame_number,
+                  Timestamp timestamp_ns)
+      : params_{params}, frame_number_{frame_number}, timestamp_{timestamp_ns} {
+  }
   Frame(const Frame &other) = default;
   Frame &operator=(const Frame &other) = default;
 
@@ -69,13 +79,15 @@ protected:
 private:
   FrameParameters params_;
   std::uint64_t frame_number_;
+  Timestamp timestamp_;
 };
 
 // No use specifying frame parameters at compile time since they'll be
 // determined by a config
 template <typename TPixel> struct FrameTmpl : public Frame {
-  FrameTmpl(size_t width, size_t height, std::uint64_t frame_number)
-      : Frame{{width, height, TPixel::format()}, frame_number},
+  FrameTmpl(size_t width, size_t height, std::uint64_t frame_number,
+            Timestamp timestamp_ns = Timestamp{0})
+      : Frame{{width, height, TPixel::format()}, frame_number, timestamp_ns},
         data_{new TPixel[size_bytes()]} {}
 
   FrameTmpl() : Frame{}, data_{nullptr} {}

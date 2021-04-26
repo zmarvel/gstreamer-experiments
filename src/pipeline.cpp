@@ -65,8 +65,10 @@ void Pipeline::add_frame_source(std::unique_ptr<FrameThread> frame_source) {
   video_info.set_format(Gst::VideoFormat::VIDEO_FORMAT_RGB, frame_params.width,
                         frame_params.height);
   const auto frame_rate = frame_source->frame_rate();
-  video_info.set_fps_n(frame_rate.numerator);
-  video_info.set_fps_d(frame_rate.denominator);
+  if (frame_rate.numerator > 0) {
+    video_info.set_fps_n(frame_rate.numerator);
+    video_info.set_fps_d(frame_rate.denominator);
+  }
   spdlog::info("Using frame rate {}/{}", frame_rate.numerator,
                frame_rate.denominator);
   auto video_caps = video_info.to_caps();
@@ -122,8 +124,13 @@ void Pipeline::appsrc_need_data_callback(GstElement *appsrc, guint length,
   framebuf->fill(0, pframe->raw_data(), pframe->size_bytes());
   const auto frame_rate = frame_source->frame_rate();
   framebuf->set_duration(frame_rate.denominator * 1e9 / frame_rate.numerator);
-  framebuf->set_dts(pframe->frame_number() *
-                    (frame_rate.denominator * 1e9 / frame_rate.numerator));
+  const auto timestamp = pframe->timestamp().count();
+  if (timestamp == 0) {
+    framebuf->set_dts(pframe->frame_number() *
+                      (frame_rate.denominator * 1e9 / frame_rate.numerator));
+  } else {
+    framebuf->set_dts(timestamp);
+  }
 
   // TODO: figure out glibmm SignalProxy
   // See gstreamermm/examples/media_player_getkmm/player_window.cc

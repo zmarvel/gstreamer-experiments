@@ -5,6 +5,10 @@ using namespace camcoder;
 template <> RGBFrame FrameSource::get_frame<RGBFrame>() {
   auto frame =
       RGBFrame{frame_params_.width, frame_params_.height, frame_count_++};
+  if (frame.timestamp().count() == 0 && frame_rate().numerator == 0) {
+    // Use the receive time as a timestamp
+    frame.set_timestamp(std::chrono::system_clock::now().time_since_epoch());
+  }
   const auto size = frame_size_bytes();
   if (read(reinterpret_cast<char *>(frame.data()), size) != size) {
     throw std::runtime_error{"Failed to read frame"};
