@@ -1,0 +1,21 @@
+[sources]
+
+# [sources.file]
+# type = "file"
+# frame_size = [ 640, 480 ]
+# pixel_format = "RGB"
+# path = "out.bin"
+# loop = true
+
+[sources.tcp_client]
+type = "tcp_client"
+frame_size = [ 640, 480 ]
+pixel_format = "RGB"
+port = 9000
+# frame_rate = 30
+
+# [sources.tcp_server]
+# type = "tcp_server"
+# frame_size = [ 640, 480 ]
+# pixel_format = "RGB"
+# port = 9000
