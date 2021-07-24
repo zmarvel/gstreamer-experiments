@@ -6,6 +6,6 @@ RUN apt update && \
     libgstreamermm-1.0 libgstreamermm-1.0-dev \
     libgtkmm-3.0-dev libgtkmm-3.0-1v5
 
-RUN apt install -y git clang-format
+RUN apt install -y git clang-format ninja-build
 
 RUN useradd -U -m -s /bin/bash user
