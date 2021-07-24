@@ -17,7 +17,7 @@ add_subdirectory(vendor/spdlog)
 add_subdirectory(vendor/cargs)
 
 add_library(BlockingCollection INTERFACE)
-target_include_directories(BlockingCollection INTERFACE lib/BlockingCollection)
+target_include_directories(BlockingCollection INTERFACE vendor/BlockingCollection)
 
 add_compile_options(-Wall -Wextra)
 
