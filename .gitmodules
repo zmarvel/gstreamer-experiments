@@ -3,7 +3,7 @@
 	url = https://github.com/fpagliughi/sockpp.git
 [submodule "lib/BlockingCollection"]
 	path = lib/BlockingCollection
-	url = https://github.com/CodeExMachina/BlockingCollection.git
+	url = http://git.zackmarvel.com/zack/BlockingCollection.git
 [submodule "lib/toml11"]
 	path = lib/toml11
 	url = https://github.com/ToruNiina/toml11.git
